@@ -1,0 +1,23 @@
+
+# Step 1: Query the CADC Advanced Search for M92 target data from SDSS APOGEE Spectrograph using RA and DEC
+# ADQL query URL-encoded
+encoded_adql_query="%0ASELECT%20p.publisherID%0AFROM%20caom2.Observation%20AS%20o%20%0AJOIN%20caom2.Plane%20AS%20p%20ON%20o.obsID%20%3D%20p.obsID%20%0AWHERE%20o.collection%20%3D%20%27SDSS%27%20%0AAND%20o.instrument_name%20%3D%20%27APOGEE%20Spectrograph%27%20%0AAND%20INTERSECTS%28p.position_bounds%2C%20CIRCLE%28%27ICRS%27%2C%20259.28%2C%2043.14%2C%200.016666666666666666%29%29%20%3D%201%0A"
+
+# Base URL for CADC TAP service
+tap_service_url="https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/argus/sync"
+
+# Download the result of the query into a CSV file
+wget -O result.csv "${tap_service_url}?REQUEST=doQuery&LANG=ADQL&QUERY=${encoded_adql_query}&FORMAT=csv"
+
+# Step 2: Read each publisher ID from the CSV and download the corresponding file
+base_url="https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/caom2ops/pkg?ID="
+
+# Read from the second line to skip the CSV header
+tail -n +2 result.csv | while IFS=, read -r id
+do
+    # Construct the full download URL
+    download_url="${base_url}${id}"
+
+    # Use wget with --content-disposition to download the file with the correct filename and extension
+    wget --content-disposition "$download_url"
+done

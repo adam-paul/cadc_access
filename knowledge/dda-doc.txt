@@ -1,0 +1,324 @@
+Direct Data Service
+The direct data service allows you to download files from the CADC archive using a URL. You can download a file either directly from your browser, automate downloading multiple files from the command-line or within a python script. If the file is in the FITS format, the Direct Data Service can also retrieve only parts of the files, such as headers, cutouts or single HDUs.
+
+Access to CADC Direct Data Service:
+
+directly from a URL
+with command line tools (CLI)
+with a Python library
+with the service API
+In order to use the Direct Data service, both a CADC Archive Name and a Complete File Name are required.
+
+Example: CFHT/1722795p.fits.fz
+
+Element	Value	Description
+{ARCHIVE}	CFHT	Identifies the data archive
+{FILENAME}	1722795p.fits.fz	Complete name of the file in the archive including the correct file extensions if any
+[OPTIONS]	meta=true	Following the filename you can add options, in this case, the FITS header
+Determining the source, the archive name and the file identifier
+Typically the Direct Data Service is meant to be used following a request to another CADC service, such as a data search query resulting from the CADC AdvancedSearch service. The result of the search will contain the full URL and can be saved in a file. If not using the AdvancedSearch service, you can still formulate the URL with knowledge of the archive and file name.
+
+Browser Usage
+If you only need to download one file from a CADC archive, the simplest way is to open your browser and enter the URL as described above in the browser URL bar.
+
+Example:
+
+Clicking on the URL below will start downloading the 310MB compressed FITS file 1722795p.fits.fz from the CFHT archive:
+
+https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/CFHT/1722795p.fits.fz
+
+Command-line Usage
+A request to the Direct Data Service can be performed from the command line. Traditional web command line client such as wget, curl, or httpie can be used, and CADC provides a slightly more evolved command-line client set of tools: cadcget, cadcput and cadcinfo. We detail their usage below.
+
+Standard command-line wget, curl
+wget and curl are standard command-line to access web services and are often already installed on a computer (Mac and Linux).
+
+Example: downloading data from the IRIS archive:
+            
+$ wget https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/IRIS/I429B4H0.fits 
+$ curl -O -J -L https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/IRIS/I429B4H0.fits
+            
+        
+For curl to behave like wget, we had to specify the following options:
+
+-O -J : will save the file locally (using the server-specified Content-Disposition filename if available, else extracts a filename from the URL) instead writing it to STDOUT.
+-L : will ensure to redirect the URL if this is required.
+If the data you are downloading isn't public, you will need to specify your CADC X509 certificate in order to download it (user/password authentication might be enabled in a future release):
+
+Example:
+
+    
+$ wget --certificate mycert.pem --ca-certificate mycert.pem https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/IRIS/I429B4H0.fits
+$ curl -E mycert.pem -O -J -L https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/IRIS/I429B4H0.fits
+    
+To download a user certificate that last for 30 days, from a browser log into the CADC at https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/en/login.html and in the response page click on your name on the upper right corner and follow "Obtain a 30 certificate" link to save it.
+
+Scripting
+wget or curl can also be used in scripts. It returns a non-zero exit status when an error occurs during execution.
+
+Example:
+
+Search for M101 from CFHT Megaprime in AdvancedSearch. Mark all images, and click "Download", selecting the "URL list in a file" option, which will download a file under the name cadcUrlList.txt. Then you can run this one-liner command to automatically download all the files listed in the query with 3 concurrent threads:
+$ cat cadcUrlList.txt | xargs -P3 wget --content-disposition
+Note: you can also automate the search with the cadctap python package.
+
+Both command lines come with many options. Use wget --help, curl --help will show them all. We only list some common ones below.
+
+Commonly used options for wget:
+-nv : non-verbose. wget sends a lot of information to STDOUT. If you are running wget in a script, you want this option.
+-q: quiet mode.
+-t, --tries NUMBER : set number of retries to NUMBER (5 recommended).
+--waitretry SECONDS : wait 1..SECONDS between retries of a retrieval. By default, wget will assume a value of 10 seconds.
+-N, --timestamping : Turn on time-stamping and download only missing or updated files.
+--content-disposition : Forces wget to give the proper name to the downloaded file.
+--certificate file : Use the certificate in file for authentication.
+--ca-certificate file : File with the bundle of CAs
+Commonly used options for curl:
+-O : save the file locally with the same name as the remote version.
+-J : use the server-specified Content-Disposition filename.
+-L : follow redirects.
+-s : make curl run quietly. If you are running curl in a script, you want this option.
+--retry NUMBER set number of retries to NUMBER (5 recommended).
+--data-urlencode : encode an non-friendly URL data into a URL friendly one, useful with cutouts.
+CADC cadc[get|put|info|remove]Clients Usage
+cadcdata is a software package for accessing the CADC Direct Data Service. It installs 4 command line applications used to manipulate data:
+
+cadcget: retrieve files from the CADC data service
+cadcinfo: get file information
+cadcput: upload new or updated files into the CADC data service
+cadcremove: remove files from the CADC data service
+It is written in Python and can be installed with:
+
+    $ pip install [--upgrade] cadcdata
+It is recommended to regurarly re-install the latest version of the package by using the pip --upgrade option.
+
+cadcget command:
+The cadcget command is constructed to be robust and performant by taking advantage of the architecture of the CADC storage system.
+
+Usage:
+
+$ cadcget {fileID}
+Where {fileID} is an identifier of a file. The complete form of the identifier is {scheme}:{archive}/{path}/{filename} where:
+
+scheme: (optional) represents a scheme assigned by the data provider cadc, mast, gemini etc.
+archive: name of the archive
+path: observatories might opt to use a file path in the identifier. This is very infrequent.
+filename: complete name of the file
+In practice, {archive}/{filename} is sufficient to access a file in the majority of cases.
+
+Example:
+
+Download the file I429B4H0.fits from the public IRIS archive to the current directory:
+$ cadcget IRIS/I429B4H0.fits
+However, the complete form will also work:
+
+$ cadcget cadc:IRIS/I429B4H0.fits
+cadcget scripting:
+cadcdata can also be used in scripts. It returns a non-zero exit status when an error occurs during execution.
+
+Examples:
+
+Download I001B3H0.fits and I016B4H0.fits files from the IRIS archive
+        
+#!/bin/bash
+archive=IRIS
+for file in I001B3H0.fits I016B4H0.fits; do
+echo "getting $archive/$file"
+cadcget $archive/$file && echo "done" || echo "failed"
+done
+        
+    
+FITS Cutouts Retrieval
+If you are dealing with FITS files, and you know you are only interested in small parts of the files, you can limit your retrievals to cutouts. A number of cutout parameters may be included, using a subset of the CFITSIO image section specification for cutout specification. Cutouts need to be encoded with cutout=<value> format in the URL as specified in the service API.
+
+Some examples of cutouts specifications for the <value>:
+Value	Explanation
+[1:512:2,2:512:2]	Open a 256x256 pixel image consisting of the odd numbered columns (1st axis) and the even numbered rows (2nd axis) of the image in the primary array of the file.
+[*,512:256]	Open an image consisting of all the columns in the input image, but only rows 256 through 512. The image will be flipped along the 2nd axis since the starting pixel is greater than the ending pixel.
+[*:2,512:256:2]	Same as above but keeping only every other row and column in the input image.
+[-*,*]	Copy the entire image, flipping it along the first axis.
+[3][1:256,1:256]	Opens a subsection of the image that is in the 3rd extension of the file.
+Command-line cutout examples
+We provide below some examples using both cadcget and curl. For curl it is often less error-prone to embed the full cutout URL between quotes and encoding the cutout value which contains the [] brackets with the --data-urlencode option.
+
+Single FITS extension cutout
+
+    
+$ cadcget "CFHT/806045o.fits.fz?cutout=[1]" --output 806045o-cutout1.fits
+$ curl -L -G -o 806045o-cutout1.fits --data-urlencode "cutout=[1]" https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/CFHT/806045o.fits.fz
+    
+Pixel coordinate cutout
+
+    
+$ cadcget "CFHTSG/D3.IQ.R.fits?cutout=[9979:10490,10573:11084]" --output D3.IQ.R.9979_10490_10573_11084.fits
+$ curl -L -G -o D3.IQ.R.9979_10490_10573_11084.fits --data-urlencode "cutout=[9979:10490,10573:11084]" https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/CFHTSG/D3.IQ.R.fits
+    
+Extension and pixel coordinate cutout
+
+    
+$ cadcget "CFHT/806045o.fits.fz?cutout=[1][1:100,1:200]" --output 806045o-cutout2.fits
+$ curl -L -G -o 806045o-cutout2.fits --data-urlencode "cutout=[1][1:100,1:200]" https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/CFHT/806045o.fits.fz
+    
+Multiple extension cutout
+
+    
+$ cadcget "CFHT/806045o.fits.fz?cutout=[1]&cutout=[2]" --output 806045o-cutout3.fits
+$ curl -L -G -o 806045o-cutout3.fits --data-urlencode "cutout=[1]" --data-urlencode "cutout=[2]" https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/CFHT/806045o.fits.fz
+    
+Multiple extension cutout with pixel coordinates
+
+    
+$ cadcget "CFHT/806045o.fits.fz?cutout=[1][10:120,20:30]&cutout=[2][10:120,20:30]" --output 806045o-cutout4.fits
+$ curl -L -G -o 806045o-cutout4.fits --data-urlencode "cutout=[1][10:120,20:30]" --data-urlencode "cutout=[2][10:120,20:30]" https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/CFHT/806045o.fits.fz
+    
+Alternatively, it is possible to specify a cutout by RA and Dec, using a slightly different service:
+
+            
+$ curl -L -O -J "https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/caom2ops/sync?id=cadc:CFHTSG/D2.I.fits&CIRCLE=150.570478+2.172356+0.01"
+            
+        
+Where the numbers are RA, Dec and size, all in degrees. Remember that in a "+" (plus sign) in a URL means " ", a blank space.
+
+FITS Headers retrieval
+Using cadcget to download a FITS header
+cadcget has a --fhead option for downloading FITS header information:
+
+    $ cadcget --fhead IRIS/I001B3H0.fits
+cadcget commonly used options:
+You can adapt cadcget to your use case with options. Below is a list of some useful options when downloading data.
+
+-u, --user=USER : If the data is not public, this option allows to specify the CADC USER to access protected data. The command will prompt for your CADC password. Example: The user John Smith with CADC username johnsmith is downloading the protected file I429B4H0.fits:
+
+    
+$ cadcget --user=johnsmith IRIS/I429B4H0.fits
+johnsmith@ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca
+Password: ********
+    
+To avoid being prompted for a password, use instead the options -c or -n.
+
+-c, --cert=/path/to/cert : specify the path a X509 temporary proxy certificate to use for authentication. Get a proxy certificate once, and re-use it multiple times for fun and profit, or send it to your trusted collaborators. Example:
+
+            
+$ cadc-get-cert -u johnsmith
+johnsmith@ws-cadc.canfar.net
+Password: ********
+
+$ cadcget --cert ~/.ssl/cadcproxy.pem IRIS/I429B4H0.fits
+            
+        
+-n, --netrc-file=/path/to/netrc : allows the legacy .netrc file format for authentication of a web service. The file has in clear text the CADC username and password, so use with with caution. Its default location is ${HOME}/.netrc. Example:
+
+            $ cadcget -n CFHT/700000o.fits.fz
+        
+--fhead : will download only the FITS header information. Example:
+
+  $ cadcget -v -n --fhead GEMINI/mrgN20091214S0271_add.fits
+-o, --output OUTPUT: write to different file name, or download into another directory
+
+-q, --quiet: will perform the operation quietly
+
+-v, --verbose: will show more dialogues and progress-bar for downloads.
+
+You can find the full list of options by running cadcget --help from a terminal.
+
+Using a data service URL to download a FITS header
+When requesting a file of type FITS, providing the parameter META=true will result in the download of the header information of the file.
+
+Example: view the headers of all extensions of a CFHT image:
+
+$ curl -L -G "https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/CFHT/2583975o.fits.fz?META=true"
+The meta=true and the cutout parameters can not be simultaneously used. A potentially useful workaround is to request a cutout of only one pixel of a given extension, e.g. cutout=[1][1:1,1:1].
+
+Advanced Usage of the Direct Data Service
+So far only the read version was covered. The Direct Data Service can also be used to upload data and to get information of a file.
+
+PUT: Uploading files
+You may have be given access to a CADC archive, to which you can upload data to. To upload a file with the data service, you must have permission to write to the target archive.
+
+The simplest is probably to use the command-line cadcput with the syntax:
+$ cadcput <fileID> src
+Note that cadcput requires the complete URI including the source, e.g. cadc:CFHT/2583975o.fits.fz. An upload is done by performing an HTTP PUT to the URL identifying the file, and supplying the file data in the accompanying input stream of the request.
+
+INFO: Retrieving metadata information of archive files
+Use the cadcinfo command to retrieve metadata for a file. The metadata available is described below:
+
+Metadata	Description
+id:	The complete ID of the file in the CADC storage
+encoding:	The type of encoding (typically compression) used (optional)
+last modified:	Date of the last file modification (optional: not present when modified during delivery)
+md5sum:	The MD5 digest of the contents of the file.
+name:	Contains a suggested filename for clients that will write the file
+size:	Size of the file
+type:	The mimetype of the file (optional: only present if type is known)
+Example:
+
+$ cadcinfo IRIS/I001B3H0.fits
+
+    CADC Storage Inventory artifact IRIS/I001B3H0.fits:
+                  id: cadc:IRIS/I001B3H0.fits
+                name: I001B3H0.fits
+                size: 1008000
+                type: application/fits
+            encoding: None
+       last modified: 2006-07-25T16:15:19.000
+              md5sum: 2ada853a8ae135e16504aeba4e47489e
+Programming with the Python library
+cadcdata package installs a Python library that can be used directly in a Python script. Documentation on how to access the library is available with the pydoc cadcdata command and can be summarized as the following 2 methods:
+
+Instantiate StorageInventoryClient class and use it to access the data.
+
+Example:
+
+    
+from cadcdata import StorageInventoryClient
+client = StorageInventoryClient()
+print(client.cadcinfo('GEMINI/N20220622S0260.fits'))
+    
+    
+id=gemini:GEMINI/N20220622S0260.fits, name=N20220622S0260.fits, size=7254720, type=application/fits, encoding=binary, last modified=2022-06-23T17:24:09.000, md5sum=6831f29dfc324e0cfc30f1bc5b86e7e4
+    
+Invoke the cadc* entry point functions. These are the functions corresponding to the command line applications (cadcget_cli, cadcinfo_cli, etc.).
+
+Example:
+
+    
+from cadcdata import cadcinfo_cli
+import sys
+sys.argv = ['cadcinfo', 'GEMINI/00AUG02_002.fits']
+cadcinfo_cli()
+    
+CADC Storage Inventory identifier GEMINI/N20220622S0260.fits:
+               id: gemini:GEMINI/N20220622S0260.fits
+             name: N20220622S0260.fits
+             size: 7254720
+             type: application/fits
+         encoding: binary
+    last modified: 2022-06-23T17:24:09.000
+           md5sum: 6831f29dfc324e0cfc30f1bc5b86e7e4
+All the CLI operations presented in this document can be performed using any of the methods listed above. The advantages and drawbacks of these methods are mentioned in the library helper.
+
+Programming with the Direct Data Service API
+If you want to program with the Direct Data Service API, we also host a full documentation of the web service functionalities which we summarize below.
+
+Transfer techniques
+Direct download: Perform an HTTP GET to https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/{archive}/{filename} and receive a redirect to the preferred download location.
+Negotiated download or upload: HTTP POST a transfer document to https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/raven/locate receive a transfer document with multiple download locations included.
+Authentication and Authorization (A&A)
+If trying to access a non-public file you will be required to authenticate. cadcdata command line tools accept CADC username and password or client certificates while the direct service access work with client certificates, cookies or bearer certificates. These A&A methods might be updated in the future. If the authentication (login) fails, you will get an HTTP 401 (Unauthorized) response. If you successfully authenticate but are not allowed to access to the file, you will get an HTTP 403 (Forbidden) response. If the file does not exist, you will get an HTTP 404 (Not Found) response.
+
+Checking for file availability and access
+To simply check if a file exists in a CADC archive, and that you have access to the file, using wget or curl you can perform an HTTP HEAD request to the same URL that you would use to download the file. This HEAD request will allow you confirm its existence, your authorization, and to gather basic meta-data about the file.
+
+To view the HTTP headers with curl, use curl --location --head or curl -L -I. With wget, use wget --server-response --spider Headers prefixed with an X- are custom CADC headers; all others are standard HTTP 1.1 headers.
+
+HTTP Header	Explanation
+content-type	The mimetype of the file (optional: only present if type is known)
+content-encoding	The type of encoding (typically compression) used (optional)
+content-disposition	Contains a suggested filename for clients that will write the file
+content-length	Size of the file as delivered
+digest	The MD5 digest of the contents of the file (value is base64 encoded)
+last-modified	Date of the last file modification (optional: not present when modified during delivery)
+Data service and file names
+You can use the Content-Disposition returned in the data HTTP response header to easily get wget to write the downloaded file to the name the file is stored in the archive with by using its --content-disposition flag. Note that you might want to also use the no-clobber option to avoid over-writing files you've already downloaded. There is not a curl option equivalent to the wget --content-disposition flag, but you could retrieve the HTTP header for the file, parse it for the content disposition and file name, then retrieve the file and saving it to that file name.
+
+For URLs which specify a cutout, the suggested filename in the Content-Disposition header will include a extra part so that different cutouts from the same file will have different filenames. This extra part is intended to be somewhat human readable, though many characters are replaced with an underscore (_) to be generally more Internet and file system compatible. This extra part will be consistent between requests with the same cutout parameters.

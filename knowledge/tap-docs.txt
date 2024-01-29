@@ -1,0 +1,85 @@
+Table Access Protocol (TAP)
+The CADC provides QUERY access to our databases via TAP-1.0. This services enables users to POST database queries over HTTP and retrieve responses in CSV, TSV or VOTable formats. The TOPCAT client is an excellent tool for TAP service interaction.
+
+Example
+To query for all observations that intersect a circle and are calibrated or advanced products a Query is submitted via the following URL:
+
+$ curl -Lv -d "REQUEST=doQuery&LANG=ADQL&QUERY=SELECT * FROM caom2.Observation AS o JOIN caom2.Plane AS p ON o.obsID=p.obsID WHERE INTERSECTS(p.position_bounds, CIRCLE('ICRS', 180, 5, 2)) = 1 AND p.calibrationLevel >= 1" https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/argus/sync
+Here is a clickable link that will execute the query and download the resulting VOTable.
+
+The ADQL tab of the CADC Advanced Search page provides the exact ADQL that was used for your search query. Examining in the 'ADQL' tab is a good way to become familar with the CADC CAOM2 database tables.
+
+Downloading Data
+One of the columns in our caom2.Plane table is the planeURI. This URI can be used to download the the files associated with the plane using a URL constrcuted following this pattern: https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/caom2ops/pkg?ID=${planeURI} where ${planeURI} is the value from the planeURI column returned by your query. Note that this URL will require authentication to access as some data is proprietary.
+
+Example
+Below is a BASH script that will download all the observations associated with proposal_id = '13BF10'.
+
+    
+        #!/bin/bash
+        export proposal_id=13BF10
+        export tap_url=https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/argus/sync
+        export download_url=https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/caom2ops/pkg
+        export REQUEST=doQuery
+        export LANG=ADQL
+        export USERNAME=timmy
+        export PASSWORD=astronomer
+        export FORMAT=CSV
+        export QUERY=select+planeURI+from+caom2.Observation+as+o+JOIN+caom2.Plane+as+p+on+o.obsID%3Dp.obsID+where+o.proposal_id=\'${proposal_id}\'
+
+        # Obtain a certificate (Optional for proprietary metadata)
+        curl -LvJO -u ${USERNAME}:${PASSWORD} "https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/cred/auth/priv?daysValid=7"
+
+        # Remove the "--cert cadcproxy.pem" portion to restrict to public metadata
+        for planeURI in `curl --cert cadcproxy.pem "${tap_url}?REQUEST=${REQUEST}&LANG=${LANG}&FORMAT=${FORMAT}&QUERY=${QUERY}"`
+        do
+            curl --cert cadcproxy.pem -J -O -L "${download_url}?ID=${planeURI}"
+        done
+    
+Unsupported ADQL Constructs
+The following ADQL Functions are not currently supported:
+
+ALL and DISTINCT within an aggragate function (AVG, COUNT, MIN, MAX)
+PI
+RAND
+TRUNCATE
+Details
+The main use of our TAP serivce is to explore our observational catalogue. Metadata for all the observations stored within the CADC are provided via the Common Archive Observation Model (CAOM-2.0) database. The tables in the CAOM2 database can be queried via the TAP service. The main tables are:
+
+caom2.Observation: this table lists observations (individual exposures or stacks of exposures).
+caom2.Plane: this table lists individual data products constructed from a particular observation, such as a RAW image, a PROCessed image or a catalog of sources.
+To use the TAP service one constructs an ADQL query and posts that query to a TAP URL. This is most easily done using tools like TOPCAT but can also be done directly using tools like cURL. The TAP URLs are:
+
+resource	description
+https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/argus/async	asychronous queries, the VOSpace destination where the result will be written is returned.
+https://ws.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/argus/sync	sychronous queries, result of query is returned.
+Other views on our collection
+In addition to the CAOM-2 database, this service also provides views of our meta-data collection that follow various IVOA table standards:
+
+caom.SIAv1: a view on CAOM2 that provides access to calibrated images; VOTable output is compatible with the Simple Image Access (SIA) version 1.0 specification
+ivoa.ObsCore: a prototype implementation of the ObsCore physical model from the ObsTap project
+More Examples
+Here are some examples of queries (with the minimal requied parameters) that should work and return a modest number of results. Note that the QUERY itself must be properly encoded since it has spaces and other special characters. These queries can be executed via the /caom/async or the /caom/sync endpoints; details on how to do that are given in the UWS and TAP specifications. We include some live URLs below that use the /caom/sync endpoint.
+
+Query SIA view for observations that contain a location:
+
+REQUEST=doQuery
+LANG=ADQL
+QUERY=select * from caom2.SIAv1
+      where CONTAINS(POINT('ICRS', 180, 5), position_bounds) = 1
+Try It!
+
+Query ObsCore view for observations that intersect a circle:
+
+REQUEST=doQuery
+LANG=ADQL
+QUERY=select * from ivoa.ObsCore
+      where INTERSECTS(s_region, CIRCLE('ICRS', 180, 5, 2)) = 1
+Try It!
+
+Query that refers to a non-existent column and table and should fail:
+
+REQUEST=doQuery
+LANG=ADQL
+QUERY=select noSuchColumn from noSuchTable
+Try It!
